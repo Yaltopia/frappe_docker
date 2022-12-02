@@ -1,19 +1,29 @@
 # Instruction on how to setup erpnext via docker locally
-
+<pre>
+</pre>
 ## Note
+<pre>
+</pre>
+
 ### Values mentioned here are for demo purposes and should be replaced with appropriate ones for your setup
-#### 1. TRAEFIK_DOMAIN IN STEP 1
-#### 2. EMAIL IN STEP 1
-#### 3. HASHED PASSWORD (ROOT) IN STEP 1
-#### 4. DB_PASSWORD IN STEP 5
-#### 5. DB_PASSWORD IN STEP 6 TO THAT GIVEN IN STEP 5
-#### 6. SITES LISTED IN STEP 6
-#### 7. value given to --mariadb-root-password in step 9 to that given in step 5
-#### 8. value given to --admin-password in step 9
-#### 9. value given to --new-site in step 9 to that given in step 6 
+1. TRAEFIK_DOMAIN IN STEP 1
+2. EMAIL IN STEP 1
+3. HASHED PASSWORD (ROOT) IN STEP 1
+4. DB_PASSWORD IN STEP 5
+5. DB_PASSWORD IN STEP 6 TO THAT GIVEN IN STEP 5
+6. SITES LISTED IN STEP 6
+7. value given to --mariadb-root-password in step 9 to that given in step 5
+8. value given to --admin-password in step 9
+9. value given to --new-site in step 9 to that given in step 6 
 <pre>
 
 </pre>
+
+### Requirements
+1. Docker with permissions setup for current user <br>
+1. Docker compose v2 <br>
+  please don't try it with v1 it won't work.
+2. if you have mariadb and redis installed then disable and stop their services. 
 
 # Step 1
 ## Clone this directory
