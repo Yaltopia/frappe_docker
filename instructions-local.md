@@ -113,6 +113,7 @@ docker compose --project-name erpnext-one exec backend \
   bench new-site test.yaltopia.site --mariadb-root-password root --install-app erpnext --admin-password root
 
 ```
+### N.B: Site and traefik domains should be added in /etc/hosts for local setup
 
 
 
