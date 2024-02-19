@@ -10,7 +10,6 @@ from tests.utils import Compose, check_url_content
 BACKEND_SERVICES = (
     "backend",
     "queue-short",
-    "queue-default",
     "queue-long",
     "scheduler",
 )
@@ -39,7 +38,7 @@ def assets_cb(text: str):
 
 
 @pytest.mark.parametrize(
-    ("url", "callback"), (("/", index_cb), ("/api/method/version", api_cb))
+    ("url", "callback"), (("/", index_cb), ("/api/method/ping", api_cb))
 )
 def test_endpoints(url: str, callback: Any, frappe_site: str):
     check_url_content(
@@ -89,44 +88,31 @@ def test_frappe_connections_in_backends(
 ):
     filename = "_ping_frappe_connections.py"
     compose("cp", f"tests/{filename}", f"{service}:/tmp/")
-    compose.exec(service, python_path, f"/tmp/{filename}")
+    compose.exec(
+        "-w",
+        "/home/frappe/frappe-bench/sites",
+        service,
+        python_path,
+        f"/tmp/{filename}",
+    )
 
 
 def test_push_backup(
-    python_path: str,
     frappe_site: str,
     s3_service: S3ServiceResult,
     compose: Compose,
 ):
+    restic_password = "secret"
     compose.bench("--site", frappe_site, "backup", "--with-files")
-    compose.exec(
-        "backend",
-        "push-backup",
-        "--site",
-        frappe_site,
-        "--bucket",
-        "frappe",
-        "--region-name",
-        "us-east-1",
-        "--endpoint-url",
-        "http://minio:9000",
-        "--aws-access-key-id",
-        s3_service.access_key,
-        "--aws-secret-access-key",
-        s3_service.secret_key,
-    )
-    compose("cp", "tests/_check_backup_files.py", "backend:/tmp")
-    compose.exec(
-        "-e",
-        f"S3_ACCESS_KEY={s3_service.access_key}",
-        "-e",
-        f"S3_SECRET_KEY={s3_service.secret_key}",
-        "-e",
-        f"SITE_NAME={frappe_site}",
-        "backend",
-        python_path,
-        "/tmp/_check_backup_files.py",
-    )
+    restic_args = [
+        "--env=RESTIC_REPOSITORY=s3:http://minio:9000/frappe",
+        f"--env=AWS_ACCESS_KEY_ID={s3_service.access_key}",
+        f"--env=AWS_SECRET_ACCESS_KEY={s3_service.secret_key}",
+        f"--env=RESTIC_PASSWORD={restic_password}",
+    ]
+    compose.exec(*restic_args, "backend", "restic", "init")
+    compose.exec(*restic_args, "backend", "restic", "backup", "sites")
+    compose.exec(*restic_args, "backend", "restic", "snapshots")
 
 
 def test_https(frappe_site: str, compose: Compose):
@@ -140,7 +126,7 @@ class TestErpnext:
         ("url", "callback"),
         (
             (
-                "/api/method/erpnext.templates.pages.product_search.get_product_list",
+                "/api/method/erpnext.templates.pages.search_help.get_help_results_sections?text=help",
                 api_cb,
             ),
             ("/assets/erpnext/js/setup_wizard.js", assets_cb),
@@ -157,7 +143,7 @@ class TestPostgres:
     def test_site_creation(self, compose: Compose):
         compose.bench(
             "new-site",
-            "test_pg_site",
+            "test-pg-site.localhost",
             "--db-type",
             "postgres",
             "--admin-password",

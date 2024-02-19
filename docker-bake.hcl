@@ -5,6 +5,13 @@ variable "REGISTRY_USER" {
     default = "frappe"
 }
 
+variable PYTHON_VERSION {
+    default = "3.11.6"
+}
+variable NODE_VERSION {
+    default = "18.18.2"
+}
+
 variable "FRAPPE_VERSION" {
     default = "develop"
 }
@@ -25,6 +32,10 @@ variable "BENCH_REPO" {
     default = "https://github.com/frappe/bench"
 }
 
+variable "LATEST_BENCH_RELEASE" {
+    default = "latest"
+}
+
 # Bench image
 
 target "bench" {
@@ -33,7 +44,10 @@ target "bench" {
     }
     context = "images/bench"
     target = "bench"
-    tags = ["frappe/bench:latest"]
+    tags = [
+        "frappe/bench:${LATEST_BENCH_RELEASE}",
+        "frappe/bench:latest",
+    ]
 }
 
 target "bench-test" {
@@ -44,16 +58,8 @@ target "bench-test" {
 # Main images
 # Base for all other targets
 
-group "frappe" {
-    targets = ["frappe-worker", "frappe-nginx", "frappe-socketio"]
-}
-
-group "erpnext" {
-    targets = ["erpnext-worker", "erpnext-nginx"]
-}
-
 group "default" {
-    targets = ["frappe", "erpnext"]
+    targets = ["erpnext"]
 }
 
 function "tag" {
@@ -68,46 +74,20 @@ function "tag" {
 
 target "default-args" {
     args = {
-        FRAPPE_REPO = "${FRAPPE_REPO}"
-        ERPNEXT_REPO = "${ERPNEXT_REPO}"
+        FRAPPE_PATH = "${FRAPPE_REPO}"
+        ERPNEXT_PATH = "${ERPNEXT_REPO}"
         BENCH_REPO = "${BENCH_REPO}"
-        FRAPPE_VERSION = "${FRAPPE_VERSION}"
-        ERPNEXT_VERSION = "${ERPNEXT_VERSION}"
-        PYTHON_VERSION = can(regex("v13", "${ERPNEXT_VERSION}")) ? "3.9.9" : "3.10.5"
-        NODE_VERSION = can(regex("v13", "${FRAPPE_VERSION}")) ? "14.19.3" : "16.18.0"
+        FRAPPE_BRANCH = "${FRAPPE_VERSION}"
+        ERPNEXT_BRANCH = "${ERPNEXT_VERSION}"
+        PYTHON_VERSION = "${PYTHON_VERSION}"
+        NODE_VERSION = "${NODE_VERSION}"
     }
 }
 
-target "frappe-worker" {
+target "erpnext" {
     inherits = ["default-args"]
-    context = "images/worker"
-    target = "frappe"
-    tags = tag("frappe-worker", "${FRAPPE_VERSION}")
-}
-
-target "erpnext-worker" {
-    inherits = ["default-args"]
-    context = "images/worker"
+    context = "."
+    dockerfile = "images/production/Containerfile"
     target = "erpnext"
-    tags =  tag("erpnext-worker", "${ERPNEXT_VERSION}")
-}
-
-target "frappe-nginx" {
-    inherits = ["default-args"]
-    context = "images/nginx"
-    target = "frappe"
-    tags =  tag("frappe-nginx", "${FRAPPE_VERSION}")
-}
-
-target "erpnext-nginx" {
-    inherits = ["default-args"]
-    context = "images/nginx"
-    target = "erpnext"
-    tags =  tag("erpnext-nginx", "${ERPNEXT_VERSION}")
-}
-
-target "frappe-socketio" {
-    inherits = ["default-args"]
-    context = "images/socketio"
-    tags =  tag("frappe-socketio", "${FRAPPE_VERSION}")
+    tags = tag("erpnext", "${ERPNEXT_VERSION}")
 }

@@ -1,25 +1,40 @@
+x-customizable-image: &customizable_image
+  # By default the image used only contains the `frappe` and `erpnext` apps.
+  # See https://github.com/frappe/frappe_docker/blob/main/docs/custom-apps.md
+  # about using custom images.
+  image: frappe/erpnext:${ERPNEXT_VERSION:?No ERPNext version set}
+
 x-depends-on-configurator: &depends_on_configurator
   depends_on:
     configurator:
       condition: service_completed_successfully
 
 x-backend-defaults: &backend_defaults
-  <<: *depends_on_configurator
-  image: frappe/frappe-worker:${FRAPPE_VERSION:?No Frappe version set}
+  <<: [*depends_on_configurator, *customizable_image]
   volumes:
     - sites:/home/frappe/frappe-bench/sites
-    - assets:/home/frappe/frappe-bench/sites/assets:ro
 
 services:
   configurator:
     <<: *backend_defaults
-    command: configure.py
+    entrypoint:
+      - bash
+      - -c
+    # add redis_socketio for backward compatibility
+    command:
+      - >
+        ls -1 apps > sites/apps.txt;
+        bench set-config -g db_host $$DB_HOST;
+        bench set-config -gp db_port $$DB_PORT;
+        bench set-config -g redis_cache "redis://$$REDIS_CACHE";
+        bench set-config -g redis_queue "redis://$$REDIS_QUEUE";
+        bench set-config -g redis_socketio "redis://$$REDIS_QUEUE";
+        bench set-config -gp socketio_port $$SOCKETIO_PORT;
     environment:
       DB_HOST: ${DB_HOST}
       DB_PORT: ${DB_PORT}
       REDIS_CACHE: ${REDIS_CACHE}
       REDIS_QUEUE: ${REDIS_QUEUE}
-      REDIS_SOCKETIO: ${REDIS_SOCKETIO}
       SOCKETIO_PORT: 9000
     depends_on: {}
 
@@ -27,7 +42,9 @@ services:
     <<: *backend_defaults
 
   frontend:
-    image: frappe/frappe-nginx:${FRAPPE_VERSION}
+    <<: *customizable_image
+    command:
+      - nginx-entrypoint.sh
     environment:
       BACKEND: backend:8000
       SOCKETIO: websocket:9000
@@ -35,30 +52,29 @@ services:
       UPSTREAM_REAL_IP_ADDRESS: ${UPSTREAM_REAL_IP_ADDRESS:-127.0.0.1}
       UPSTREAM_REAL_IP_HEADER: ${UPSTREAM_REAL_IP_HEADER:-X-Forwarded-For}
       UPSTREAM_REAL_IP_RECURSIVE: ${UPSTREAM_REAL_IP_RECURSIVE:-off}
+      PROXY_READ_TIMEOUT: ${PROXY_READ_TIMEOUT:-120}
+      CLIENT_MAX_BODY_SIZE: ${CLIENT_MAX_BODY_SIZE:-50m}
     volumes:
-      - sites:/usr/share/nginx/html/sites
-      - assets:/usr/share/nginx/html/assets
+      - sites:/home/frappe/frappe-bench/sites
     depends_on:
       - backend
       - websocket
 
   websocket:
-    <<: *depends_on_configurator
-    image: frappe/frappe-socketio:${FRAPPE_VERSION}
+    <<: [*depends_on_configurator, *customizable_image]
+    command:
+      - node
+      - /home/frappe/frappe-bench/apps/frappe/socketio.js
     volumes:
       - sites:/home/frappe/frappe-bench/sites
 
   queue-short:
     <<: *backend_defaults
-    command: bench worker --queue short
-
-  queue-default:
-    <<: *backend_defaults
-    command: bench worker --queue default
+    command: bench worker --queue short,default
 
   queue-long:
     <<: *backend_defaults
-    command: bench worker --queue long
+    command: bench worker --queue long,default,short
 
   scheduler:
     <<: *backend_defaults
@@ -67,4 +83,3 @@ services:
 # ERPNext requires local assets access (Frappe does not)
 volumes:
   sites:
-  assets:

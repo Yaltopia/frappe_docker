@@ -1,4 +1,5 @@
 import os
+import re
 import shutil
 import subprocess
 from dataclasses import dataclass
@@ -22,11 +23,26 @@ def _add_version_var(name: str, env_path: Path):
         f.write(f"\n{name}={os.environ[name]}")
 
 
+def _add_sites_var(env_path: Path):
+    with open(env_path, "r+") as f:
+        content = f.read()
+        content = re.sub(
+            rf"SITES=.*",
+            f"SITES=`tests.localhost`,`test-erpnext-site.localhost`,`test-pg-site.localhost`",
+            content,
+        )
+        f.seek(0)
+        f.truncate()
+        f.write(content)
+
+
 @pytest.fixture(scope="session")
 def env_file(tmp_path_factory: pytest.TempPathFactory):
     tmp_path = tmp_path_factory.mktemp("frappe-docker")
     file_path = tmp_path / ".env"
     shutil.copy("example.env", file_path)
+
+    _add_sites_var(file_path)
 
     for var in ("FRAPPE_VERSION", "ERPNEXT_VERSION"):
         _add_version_var(name=var, env_path=file_path)
@@ -52,14 +68,15 @@ def frappe_setup(compose: Compose):
 
 @pytest.fixture(scope="session")
 def frappe_site(compose: Compose):
-    site_name = "tests"
+    site_name = "tests.localhost"
     compose.bench(
         "new-site",
-        site_name,
+        "--no-mariadb-socket",
         "--mariadb-root-password",
         "123",
         "--admin-password",
         "admin",
+        site_name,
     )
     compose("restart", "backend")
     yield site_name
@@ -68,11 +85,7 @@ def frappe_site(compose: Compose):
 @pytest.fixture(scope="class")
 def erpnext_setup(compose: Compose):
     compose.stop()
-
-    args = ["-f", "overrides/compose.erpnext.yaml"]
-    if CI:
-        args += ("-f", "tests/compose.ci-erpnext.yaml")
-    compose(*args, "up", "-d", "--quiet-pull")
+    compose("up", "-d", "--quiet-pull")
 
     yield
     compose.stop()
@@ -80,23 +93,18 @@ def erpnext_setup(compose: Compose):
 
 @pytest.fixture(scope="class")
 def erpnext_site(compose: Compose):
-    site_name = "test_erpnext_site"
+    site_name = "test-erpnext-site.localhost"
     args = [
         "new-site",
-        site_name,
+        "--no-mariadb-socket",
         "--mariadb-root-password",
         "123",
         "--admin-password",
         "admin",
         "--install-app",
         "erpnext",
+        site_name,
     ]
-    erpnext_version = os.environ.get("ERPNEXT_VERSION")
-    if erpnext_version in [
-        "develop",
-        "version-14",
-    ] or erpnext_version.startswith("v14"):
-        args.append("--install-app=payments")
     compose.bench(*args)
     compose("restart", "backend")
     yield site_name

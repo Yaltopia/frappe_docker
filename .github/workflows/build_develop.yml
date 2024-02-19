@@ -5,9 +5,7 @@ on:
     branches:
       - main
     paths:
-      - images/nginx/**
-      - images/socketio/**
-      - images/worker/**
+      - images/production/**
       - overrides/**
       - tests/**
       - compose.yaml
@@ -28,6 +26,8 @@ jobs:
       repo: erpnext
       version: develop
       push: ${{ github.repository == 'frappe/frappe_docker' && github.event_name != 'pull_request' }}
+      python_version: 3.11.6
+      node_version: 18.18.2
     secrets:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
       DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}

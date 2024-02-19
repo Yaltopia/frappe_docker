@@ -1,8 +1,22 @@
+# How to install ERPNext on linux/mac using Frappe_docker ?
+
+step1: clone the repo
+
+```
+git clone https://github.com/frappe/frappe_docker
+```
+
+step2: add platform: linux/amd64 to all services in the /pwd.yaml
+
+here is the update pwd.yml file
+
+```yml
 version: "3"
 
 services:
   backend:
-    image: frappe/erpnext:v15.14.3
+    image: frappe/erpnext:v14
+    platform: linux/amd64
     deploy:
       restart_policy:
         condition: on-failure
@@ -11,14 +25,14 @@ services:
       - logs:/home/frappe/frappe-bench/logs
 
   configurator:
-    image: frappe/erpnext:v15.14.3
+    image: frappe/erpnext:v14
+    platform: linux/amd64
     deploy:
       restart_policy:
         condition: none
     entrypoint:
       - bash
       - -c
-    # add redis_socketio for backward compatibility
     command:
       - >
         ls -1 apps > sites/apps.txt;
@@ -26,7 +40,6 @@ services:
         bench set-config -gp db_port $$DB_PORT;
         bench set-config -g redis_cache "redis://$$REDIS_CACHE";
         bench set-config -g redis_queue "redis://$$REDIS_QUEUE";
-        bench set-config -g redis_socketio "redis://$$REDIS_QUEUE";
         bench set-config -gp socketio_port $$SOCKETIO_PORT;
     environment:
       DB_HOST: db
@@ -39,7 +52,8 @@ services:
       - logs:/home/frappe/frappe-bench/logs
 
   create-site:
-    image: frappe/erpnext:v15.14.3
+    image: frappe/erpnext:v14
+    platform: linux/amd64
     deploy:
       restart_policy:
         condition: none
@@ -71,6 +85,7 @@ services:
 
   db:
     image: mariadb:10.6
+    platform: linux/amd64
     healthcheck:
       test: mysqladmin ping -h localhost --password=admin
       interval: 1s
@@ -89,9 +104,8 @@ services:
       - db-data:/var/lib/mysql
 
   frontend:
-    image: frappe/erpnext:v15.14.3
-    depends_on:
-      - websocket
+    image: frappe/erpnext:v14
+    platform: linux/amd64
     deploy:
       restart_policy:
         condition: on-failure
@@ -113,7 +127,8 @@ services:
       - "8080:8080"
 
   queue-long:
-    image: frappe/erpnext:v15.14.3
+    image: frappe/erpnext:v14
+    platform: linux/amd64
     deploy:
       restart_policy:
         condition: on-failure
@@ -121,13 +136,14 @@ services:
       - bench
       - worker
       - --queue
-      - long,default,short
+      - long
     volumes:
       - sites:/home/frappe/frappe-bench/sites
       - logs:/home/frappe/frappe-bench/logs
 
   queue-short:
-    image: frappe/erpnext:v15.14.3
+    image: frappe/erpnext:v14
+    platform: linux/amd64
     deploy:
       restart_policy:
         condition: on-failure
@@ -135,13 +151,14 @@ services:
       - bench
       - worker
       - --queue
-      - short,default
+      - short
     volumes:
       - sites:/home/frappe/frappe-bench/sites
       - logs:/home/frappe/frappe-bench/logs
 
   redis-queue:
     image: redis:6.2-alpine
+    platform: linux/amd64
     deploy:
       restart_policy:
         condition: on-failure
@@ -150,6 +167,7 @@ services:
 
   redis-cache:
     image: redis:6.2-alpine
+    platform: linux/amd64
     deploy:
       restart_policy:
         condition: on-failure
@@ -157,7 +175,8 @@ services:
       - redis-cache-data:/data
 
   scheduler:
-    image: frappe/erpnext:v15.14.3
+    image: frappe/erpnext:v14
+    platform: linux/amd64
     deploy:
       restart_policy:
         condition: on-failure
@@ -169,7 +188,8 @@ services:
       - logs:/home/frappe/frappe-bench/logs
 
   websocket:
-    image: frappe/erpnext:v15.14.3
+    image: frappe/erpnext:v14
+    platform: linux/amd64
     deploy:
       restart_policy:
         condition: on-failure
@@ -186,3 +206,20 @@ volumes:
   redis-cache-data:
   sites:
   logs:
+```
+
+step3: run the docker
+
+```
+cd frappe_docker
+```
+
+```
+docker-compose -f ./pwd.yml up
+```
+
+---
+
+Wait for couple of minutes.
+
+Open localhost:8080
